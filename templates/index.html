@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Temperature Prediction</title>
+</head>
+
+<body>
+    <h1>Dự đoán nhiệt độ</h1>
+    <button id="predict-btn">Dự đoán</button>
+    <h2>Kết quả dự đoán:</h2>
+    <pre id="result"></pre>
+
+    <script>
+        document.getElementById('predict-btn').addEventListener('click', function () {
+            // Dữ liệu nhiệt độ lịch sử với đủ 24 phần tử
+            const historyData = [
+                30.0, 22.0, 22.0, 27.0, 28.0, 27.0, 24.0, 23.0, 22.0, 21.0,
+                20.0, 21.5, 22.5, 23.5, 24.5, 25.0, 26.0, 27.0, 36.0, 29.0,
+                31.0, 30.5, 35.0, 37.0
+            ]; // Đủ 24 giá trị để dự đoán
+
+            fetch('/predict', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ data: historyData })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        document.getElementById('result').textContent = 'Error: ' + data.error;
+                    } else {
+                        document.getElementById('result').textContent = JSON.stringify(data.predictions, null, 2);
+                    }
+                })
+                .catch(error => console.error('Error:', error));
+        });
+    </script>
+</body>
+
+</html>
