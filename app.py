@@ -2,36 +2,40 @@ from flask import Flask, render_template, request, jsonify
 import numpy as np
 import pandas as pd
 import tensorflow as tf
+import joblib
 from sklearn.preprocessing import MinMaxScaler
+from tensorflow.keras.models import load_model
 
 app = Flask(__name__)
 
-# Tải mô hình LSTM
-model = tf.keras.models.load_model('/Users/lengocloc/Documents/cloud-cache/vi-education-backend-AI/model/temperature_model_lstm.h5')
+
+# Tải mô hình LSTM bằng TensorFlow
+lstm_model = load_model('/Users/lengocloc/Documents/cloud-cache/vi-education-backend-AI/model/temperature_model_lstm.h5')
+
+# Tải mô hình Linear Regression bằng joblib (nếu là mô hình scikit-learn)
+linear_model = joblib.load('/Users/lengocloc/Documents/cloud-cache/vi-education-backend-AI/model/linear_regression_model.pkl')
 
 # Hàm chuẩn hóa và tạo dữ liệu đầu vào cho LSTM
-def prepare_input(data, time_step):
+def prepare_lstm_input(data, time_step):
     scaler = MinMaxScaler(feature_range=(0, 1))
-    
-    # Chuyển đổi dữ liệu sang mảng numpy và reshape thành mảng 2 chiều
     X = np.array(data).reshape(-1, 1)
-    
-    # Chuẩn hóa dữ liệu
     X = scaler.fit_transform(X)
     
-    # Tạo các chuỗi thời gian cho LSTM
     X_list = []
     for i in range(len(X) - time_step + 1):
         X_list.append(X[i:i + time_step, 0])
-    
     X = np.array(X_list)
 
-    # Kiểm tra kích thước của X trước khi reshape
     if X.shape[0] == 0 or X.shape[1] == 0:
         raise ValueError("Invalid data shape after processing: {}".format(X.shape))
 
-    # Trả về dữ liệu đã chuẩn bị (thêm chiều thứ 3 để LSTM sử dụng)
     return X.reshape(X.shape[0], X.shape[1], 1), scaler
+
+# Hàm dự đoán bằng Linear Regression
+def linear_regression_predict(features):
+    features = np.array(features).reshape(1, -1)  # Đảm bảo dữ liệu có dạng (1, 8)
+    predictions = linear_model.predict(features)  # Dự đoán bằng Linear Regression
+    return predictions.flatten()
 
 @app.route('/')
 def index():
@@ -39,46 +43,49 @@ def index():
 
 @app.route('/predict', methods=['POST'])
 def predict():
-    # Nhận dữ liệu từ client
-    data = request.json['data']
+   # Nhận dữ liệu từ yêu cầu
+    data = request.json['data']['data']  # Truy cập vào cấu trúc chính xác
+    lstm_data = data['lstm_data']  # Truy cập lstm_data
+    linear_data = data['linear_data']  # Truy cập linear_data
     
-    # Chọn số bước thời gian
-    time_step = 24  # Sử dụng 24 giờ để dự đoán
+    # Số bước thời gian cho LSTM
+    time_step = 24
 
-    # Chuẩn bị dữ liệu đầu vào
-    X_input, scaler = prepare_input(data[-time_step:], time_step)
+    # Chuẩn bị dữ liệu cho Linear Regression
+    linear_predictions = linear_regression_predict(linear_data)
+
+    # Chuẩn bị dữ liệu cho LSTM
+    X_input, scaler = prepare_lstm_input(lstm_data, time_step)
     
-    # Dự đoán cho 56 thời điểm (7 ngày * 8 thời điểm mỗi ngày)
+    # Dự đoán bằng LSTM cho 56 thời điểm (7 ngày * 8 thời điểm mỗi ngày)
     num_predictions = 56
-    predictions = []
+    lstm_predictions = []
     for _ in range(num_predictions):
-        y_pred = model.predict(X_input)
-        predictions.append(y_pred[0, 0])  # Lưu giá trị dự đoán
+        y_pred = lstm_model.predict(X_input)
+        lstm_predictions.append(y_pred[0, 0])  # Lưu giá trị dự đoán của LSTM
         
         # Cập nhật dữ liệu đầu vào cho lần dự đoán tiếp theo
         X_input = np.append(X_input[:, 1:, :], y_pred.reshape(1, 1, 1), axis=1)
 
-    # Chuyển đổi lại về kích thước gốc
-    predictions = scaler.inverse_transform(np.array(predictions).reshape(-1, 1))
+    # Chuyển đổi giá trị dự đoán của LSTM về giá trị gốc
+    lstm_predictions = scaler.inverse_transform(np.array(lstm_predictions).reshape(-1, 1)).flatten()
 
-    # Tạo mảng kết quả
+    # Kết hợp kết quả từ LSTM và Linear Regression
+    # Ở đây ta chỉ kết hợp linear_predictions với một phần dữ liệu từ lstm_predictions
+    combined_predictions = (linear_predictions + lstm_predictions[:len(linear_predictions)]) / 2
+
+    # Tạo mảng kết quả trả về
     result = []
-    start_date = pd.to_datetime('2015-12-31')  # Ngày bắt đầu
-    for i in range(num_predictions):
-        prediction_date = start_date + pd.Timedelta(hours=(i * 3))  # Tính toán thời gian dự đoán
+    start_date = pd.to_datetime('2024-01-01')  # Ngày bắt đầu (có thể thay đổi tùy theo dữ liệu của bạn)
+    for i in range(len(combined_predictions)):
+        prediction_date = start_date + pd.Timedelta(hours=(i * 3))  # Mỗi dự đoán cách nhau 3 giờ
         result.append({
             'time': prediction_date.strftime('%Y-%m-%d %H:%M:%S'),
-            'temperature': float(predictions[i][0]),  # Chuyển đổi thành float
-            'date': prediction_date.strftime('%Y-%m-%d')
+            'temperature': float(combined_predictions[i])  # Chuyển đổi thành kiểu float
         })
 
     # Trả về kết quả dự đoán
     return jsonify({'predictions': result})
-
-
-
-
-
 
 if __name__ == '__main__':
     app.run(debug=True)

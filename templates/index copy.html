@@ -15,18 +15,12 @@
 
     <script>
         document.getElementById('predict-btn').addEventListener('click', function () {
-            // Dữ liệu nhiệt độ lịch sử giả định
-            const historyData = {
-                "data": {
-                    "lstm_data": [
-                        30.0, 22.0, 22.0, 27.0, 28.0, 27.0, 24.0, 23.0, 22.0, 21.0,
-                        20.0, 21.5, 22.5, 23.5, 24.5, 25.0, 26.0, 27.0, 36.0, 29.0,
-                        31.0, 30.5, 35.0, 37.0
-                    ],
-                    "linear_data": [0, 0, 0, 0, 0, 0, 0, 0]  // 8 đặc trưng
-                }
-            }
-            // Bạn có thể thay đổi dữ liệu này
+            // Dữ liệu nhiệt độ lịch sử với đủ 24 phần tử
+            const historyData = [
+                30.0, 22.0, 22.0, 27.0, 28.0, 27.0, 24.0, 23.0, 22.0, 21.0,
+                20.0, 21.5, 22.5, 23.5, 24.5, 25.0, 26.0, 27.0, 36.0, 29.0,
+                31.0, 30.5, 35.0, 37.0
+            ]; // Đủ 24 giá trị để dự đoán
 
             fetch('/predict', {
                 method: 'POST',
@@ -37,7 +31,11 @@
             })
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('result').textContent = JSON.stringify(data.predictions, null, 2);
+                    if (data.error) {
+                        document.getElementById('result').textContent = 'Error: ' + data.error;
+                    } else {
+                        document.getElementById('result').textContent = JSON.stringify(data.predictions, null, 2);
+                    }
                 })
                 .catch(error => console.error('Error:', error));
         });
