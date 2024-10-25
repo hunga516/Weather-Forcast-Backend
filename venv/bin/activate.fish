@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV "/Users/lengocloc/Documents/cloud-cache/vi-education-backend-AI/venv"
+set -gx VIRTUAL_ENV "/Users/lengocloc/Documents/cloud-cache/Weather-Forcast-Backend/venv"
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/bin" $PATH
