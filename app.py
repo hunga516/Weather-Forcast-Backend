@@ -9,9 +9,9 @@ from tensorflow.keras.models import load_model
 app = Flask(__name__)
 
 
-lstm_model = load_model('/Users/lengocloc/Documents/cloud-cache/vi-education-backend-AI/model/temperature_model_lstm.h5')
+lstm_model = load_model('C:/Users/Admin/Downloads/cloud-cache/Weather-Forcast-Backend/model/temperature_model_lstm.h5')
 
-linear_model = joblib.load('/Users/lengocloc/Documents/cloud-cache/vi-education-backend-AI/model/linear_regression_model.pkl')
+linear_model = joblib.load('C:/Users/Admin/Downloads/cloud-cache/Weather-Forcast-Backend/model/linear_regression_model.pkl')
 
 def prepare_lstm_input(data, time_step):
     scaler = MinMaxScaler(feature_range=(0, 1))
@@ -61,7 +61,7 @@ def predict():
     combined_predictions = (linear_predictions + lstm_predictions[:len(linear_predictions)]) / 2
 
     result = []
-    start_date = pd.to_datetime('2015-12-31')
+    start_date = pd.to_datetime('2016-01-01')
     for i in range(num_predictions):  
         prediction_date = start_date + pd.Timedelta(hours=(i * 3))  
         result.append({

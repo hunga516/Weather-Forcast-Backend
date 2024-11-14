@@ -15,7 +15,6 @@
 
     <script>
         document.getElementById('predict-btn').addEventListener('click', function () {
-            // Dữ liệu nhiệt độ lịch sử giả định
             const historyData = {
                 "data": {
                     "lstm_data": [
@@ -23,11 +22,9 @@
                         20.0, 21.5, 22.5, 23.5, 24.5, 25.0, 26.0, 27.0, 36.0, 29.0,
                         31.0, 30.5, 35.0, 37.0
                     ],
-                    "linear_data": [0, 0, 0, 0, 0, 0, 0, 0]  // 8 đặc trưng
+                    "linear_data": [23.0, 25.0, 15.0, 0.0, 0.97, 0.97, 1010.0, 1010.0]  // 8 đặc trưng
                 }
             }
-            // Bạn có thể thay đổi dữ liệu này
-
             fetch('/predict', {
                 method: 'POST',
                 headers: {
