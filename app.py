@@ -5,8 +5,23 @@ import tensorflow as tf
 import joblib
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import load_model
+from flask_cors import CORS
+from pymongo import MongoClient
+
 
 app = Flask(__name__)
+CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
+
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    return response
+
+# Kết nối tới MongoDB
+client = MongoClient("mongodb+srv://hunga5160:hunga5160@cluster0.0uxnqct.mongodb.net/?retryWrites=true&w=majority&tlsAllowInvalidCertificates=true")
+db = client["weather_forcast"]
+locations_collection = db["locations"]
 
 
 lstm_model = load_model('/Users/lengocloc/Documents/cloud-cache/vi-education-backend-AI/model/temperature_model_lstm.h5')
@@ -36,6 +51,43 @@ def linear_regression_predict(features):
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/predict', methods=['GET'])
+def getPredict():
+    lstm_data = [
+                        30.0, 22.0, 22.0, 27.0, 28.0, 27.0, 24.0, 23.0, 22.0, 21.0,
+                        20.0, 21.5, 22.5, 23.5, 24.5, 25.0, 26.0, 27.0, 36.0, 29.0,
+                        31.0, 30.5, 35.0, 37.0
+                    ]
+    linear_data = [0, 0, 0, 0, 0, 0, 0, 0]
+
+    time_step = 24
+    num_predictions = 56  
+
+    linear_predictions = linear_regression_predict(linear_data)
+
+    X_input, scaler = prepare_lstm_input(lstm_data, time_step)
+
+    lstm_predictions = []
+    for _ in range(num_predictions):
+        y_pred = lstm_model.predict(X_input)
+        lstm_predictions.append(y_pred[0, 0])
+        X_input = np.append(X_input[:, 1:, :], y_pred.reshape(1, 1, 1), axis=1)
+
+    lstm_predictions = scaler.inverse_transform(np.array(lstm_predictions).reshape(-1, 1)).flatten()
+
+    combined_predictions = (linear_predictions + lstm_predictions[:len(linear_predictions)]) / 2
+
+    result = []
+    start_date = pd.to_datetime('2015-12-31')
+    for i in range(num_predictions):  
+        prediction_date = start_date + pd.Timedelta(hours=(i * 3))  
+        result.append({
+            'time': prediction_date.strftime('%Y-%m-%d %H:%M:%S'),
+            'temperature': float(lstm_predictions[i])  
+        })
+
+    return jsonify({'predictions': result})
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -71,6 +123,30 @@ def predict():
 
     return jsonify({'predictions': result})
 
+@app.route('/locations', methods=['GET'])
+def get_locations():
+    name = request.args.get('name')
 
-if __name__ == '__main__':
-    app.run(debug=True)
+    try:
+        if name:
+            query = {"name": name}
+            documents = locations_collection.find(query)
+        else:
+            documents = locations_collection.find()
+
+        result = []
+        for doc in documents:
+            result.append({
+                "id": str(doc["_id"]),
+                "name": doc["name"],
+                "lat": doc["lat"],
+                "lon": doc["lon"]
+            })
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+if __name__ == "__main__":
+    app.run(port=8000, debug=True)
