@@ -24,9 +24,9 @@ db = client["weather_forcast"]
 locations_collection = db["locations"]
 
 
-lstm_model = load_model('/Users/lengocloc/Documents/cloud-cache/vi-education-backend-AI/model/temperature_model_lstm.h5')
+lstm_model = load_model('./model/temperature_model_lstm.h5')
 
-linear_model = joblib.load('/Users/lengocloc/Documents/cloud-cache/vi-education-backend-AI/model/linear_regression_model.pkl')
+linear_model = joblib.load('./model/linear_regression_model.pkl')
 
 def prepare_lstm_input(data, time_step):
     scaler = MinMaxScaler(feature_range=(0, 1))

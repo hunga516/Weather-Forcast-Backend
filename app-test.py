@@ -13,9 +13,7 @@ end = datetime(2015, 12, 31)
 
 # Tọa độ của Quận 1, Quận 2, Quận 3 ở TPHCM
 districts = {
-    'Quận 1': {'lat': 10.7758, 'lon': 106.7009},
-    # 'Quận 2': {'lat': 10.7872, 'lon': 106.7496},
-    # 'Quận 3': {'lat': 10.7794, 'lon': 106.6843},
+   'Huyện Nhà Bè': {'lat': 10.6971, 'lon': 106.7043}
 }
 
 # Tạo một DataFrame để lưu dữ liệu thời tiết của từng quận
@@ -43,7 +41,7 @@ for district, coords in districts.items():
 weather_data.reset_index(inplace=True)
 
 # Lưu dữ liệu vào file CSV
-weather_data.to_csv('weather_data_2009_2015_QUAN1.csv', index=False, encoding='utf-8')
+weather_data.to_csv('weather_data_2009_2015_HUYENNHABE.csv', index=False, encoding='utf-8')
 
 # Hiển thị thông báo hoàn tất
-print("Dữ liệu đã được lưu vào file 'weather_data_2009_2015_QUAN1.csv'")
+print("Dữ liệu đã được lưu vào file 'weather_data_2009_2015_HUYENNHABE.csv'")
