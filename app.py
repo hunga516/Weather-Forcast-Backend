@@ -129,7 +129,7 @@ def get_locations():
 
     try:
         if name:
-            query = {"name": name}
+            query = {"name": {"$regex": name, "$options": "i"}}
             documents = locations_collection.find(query)
         else:
             documents = locations_collection.find()
@@ -143,10 +143,10 @@ def get_locations():
                 "lon": doc["lon"]
             })
 
-        return jsonify(result), 200
-
+        return jsonify(result), 200 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(port=8000, debug=True)
