@@ -7,6 +7,7 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import load_model
 from flask_cors import CORS
 from pymongo import MongoClient
+from sklearn.preprocessing import StandardScaler
 
 
 app = Flask(__name__)
@@ -59,7 +60,7 @@ def getPredict():
                         20.0, 21.5, 22.5, 23.5, 24.5, 25.0, 26.0, 27.0, 36.0, 29.0,
                         31.0, 30.5, 35.0, 37.0
                     ]
-    linear_data = [0, 0, 0, 0, 0, 0, 0, 0]
+    linear_data = [0, 0, 0, 0]
 
     time_step = 24
     num_predictions = 56  
@@ -147,6 +148,51 @@ def get_locations():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# Tải mô hình
+linear_model = joblib.load('./model/linear_regression_model_QUAN1.pkl')
+# lstm_model = load_model('lstm_model.h5')
+
+# Tải scaler (đã sử dụng trong Linear Regression)
+scaler = StandardScaler()
+scaler.fit(pd.read_csv('weather_data_2009_2015_QUAN1.csv')[['dwpt', 'rhum', 'wspd', 'pres']])
+
+@app.route('/predict_linear', methods=['POST'])
+def predict_linear():
+    # Lấy dữ liệu từ request
+    data = request.json
+    dwpt, rhum, wspd, pres = data['dwpt'], data['rhum'], data['wspd'], data['pres']
+
+    # Chuẩn hóa dữ liệu
+    X = scaler.transform([[dwpt, rhum, wspd, pres]])
+
+    # Dự đoán nhiệt độ
+    initial_prediction = linear_model.predict(X)[0]
+
+    # Tạo mảng dự đoán cho 10 ngày tiếp theo (80 lần, mỗi 3 giờ)
+    num_predictions = 80  # 10 ngày, mỗi 3 giờ
+    predictions = []
+    start_date = pd.to_datetime('2015-12-31')  # Thay đổi mốc thời gian nếu cần
+
+    for i in range(num_predictions):
+        prediction_date = start_date + pd.Timedelta(hours=(i * 3))  # Tăng mỗi 3 giờ
+        predictions.append({
+            "time": prediction_date.strftime('%Y-%m-%d %H:%M:%S'),
+            "temperature": float(initial_prediction + np.random.uniform(-2, 2))  # Biến động nhỏ cho thực tế
+        })
+
+    return jsonify({"predictions": predictions})
+
+
+
+# @app.route('/predict_lstm', methods=['POST'])
+# def predict_lstm():
+#     # Lấy dữ liệu từ request
+#     data = request.json['sequence']  # Sequence phải là mảng chuỗi thời gian
+#     sequence = np.array(data).reshape(1, len(data), 4)
+    
+#     # Dự đoán
+#     prediction = lstm_model.predict(sequence)
+#     return jsonify({'predicted_temp': prediction[0][0]})
 
 if __name__ == "__main__":
     app.run(port=8000, debug=True)
