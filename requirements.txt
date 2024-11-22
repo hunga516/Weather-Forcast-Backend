@@ -50,10 +50,10 @@ scipy==1.14.1
 setuptools==75.2.0
 six==1.16.0
 StandardScaler==0.5
-tensorboard==2.17.1
+tensorboard==2.18.0
 tensorboard-data-server==0.7.2
-tensorflow==2.17.0
-tensorflow-intel==2.17.0
+tensorflow==2.18.0
+tensorflow_intel==2.18.0
 termcolor==2.5.0
 threadpoolctl==3.5.0
 toolz==1.0.0
