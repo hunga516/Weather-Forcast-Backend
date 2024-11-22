@@ -8,7 +8,7 @@ from tensorflow.keras.models import load_model
 from flask_cors import CORS
 from pymongo import MongoClient
 from sklearn.preprocessing import StandardScaler
-
+from bson import ObjectId
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
@@ -60,7 +60,7 @@ def getPredict():
                         20.0, 21.5, 22.5, 23.5, 24.5, 25.0, 26.0, 27.0, 36.0, 29.0,
                         31.0, 30.5, 35.0, 37.0
                     ]
-    linear_data = [0, 0, 0, 0]
+    linear_data = [0, 0, 0, 0,0,0,0,0]
 
     time_step = 24
     num_predictions = 56  
@@ -97,7 +97,7 @@ def predict():
     linear_data = data['linear_data']
 
     time_step = 24
-    num_predictions = 56  
+    num_predictions = 80  
 
     linear_predictions = linear_regression_predict(linear_data)
 
@@ -148,51 +148,79 @@ def get_locations():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Tải mô hình
-linear_model = joblib.load('./model/linear_regression_model_QUAN1.pkl')
-# lstm_model = load_model('lstm_model.h5')
-
-# Tải scaler (đã sử dụng trong Linear Regression)
-scaler = StandardScaler()
-scaler.fit(pd.read_csv('weather_data_2009_2015_QUAN1.csv')[['dwpt', 'rhum', 'wspd', 'pres']])
-
-@app.route('/predict_linear', methods=['POST'])
-def predict_linear():
-    # Lấy dữ liệu từ request
-    data = request.json
-    dwpt, rhum, wspd, pres = data['dwpt'], data['rhum'], data['wspd'], data['pres']
-
-    # Chuẩn hóa dữ liệu
-    X = scaler.transform([[dwpt, rhum, wspd, pres]])
-
-    # Dự đoán nhiệt độ
-    initial_prediction = linear_model.predict(X)[0]
-
-    # Tạo mảng dự đoán cho 10 ngày tiếp theo (80 lần, mỗi 3 giờ)
-    num_predictions = 80  # 10 ngày, mỗi 3 giờ
-    predictions = []
-    start_date = pd.to_datetime('2015-12-31')  # Thay đổi mốc thời gian nếu cần
-
-    for i in range(num_predictions):
-        prediction_date = start_date + pd.Timedelta(hours=(i * 3))  # Tăng mỗi 3 giờ
-        predictions.append({
-            "time": prediction_date.strftime('%Y-%m-%d %H:%M:%S'),
-            "temperature": float(initial_prediction + np.random.uniform(-2, 2))  # Biến động nhỏ cho thực tế
-        })
-
-    return jsonify({"predictions": predictions})
 
 
 
-# @app.route('/predict_lstm', methods=['POST'])
-# def predict_lstm():
-#     # Lấy dữ liệu từ request
-#     data = request.json['sequence']  # Sequence phải là mảng chuỗi thời gian
-#     sequence = np.array(data).reshape(1, len(data), 4)
-    
-#     # Dự đoán
-#     prediction = lstm_model.predict(sequence)
-#     return jsonify({'predicted_temp': prediction[0][0]})
+@app.route('/predict_district/<id>', methods=['POST'])
+def predict_district(id):
+    try:
+        # Tìm document theo ObjectId
+        document = locations_collection.find_one({"_id": ObjectId(id)})
+
+        if not document:
+            return jsonify({"error": "District not found"}), 404
+
+        # Lấy thông tin từ document
+        linear_model_name = document['linear_model']
+        lstm_model_name = document['lstm_model']
+        data_file = document['data']
+
+        # Tải các mô hình và dữ liệu
+        linear_model = joblib.load(f'./model/{linear_model_name}')
+        lstm_model = load_model(f'./model/{lstm_model_name}')
+        data_path = f'./data/{data_file}'
+        
+        # Đọc dữ liệu từ file và kiểm tra
+        df = pd.read_csv(data_path)
+        # if df.isnull().values.any():
+        #     return jsonify({"error": "Data file contains NaN values"}), 400
+
+        scaler = StandardScaler()
+        scaler.fit(df[['dwpt', 'rhum', 'wspd', 'pres']])
+
+        # Lấy dữ liệu từ request
+        data = request.json
+        dwpt, rhum, wspd, pres = data['dwpt'], data['rhum'], data['wspd'], data['pres']
+
+        # Chuẩn bị đầu vào cho mô hình Linear
+        X = scaler.transform([[dwpt, rhum, wspd, pres]])
+        linear_prediction = linear_model.predict(X)[0]
+
+        # Chuẩn bị đầu vào cho LSTM
+        history_steps = 10 * 8  # 10 ngày x 8 lần đo
+        historical_data = df.tail(history_steps)[['dwpt', 'rhum', 'wspd', 'pres']].dropna()
+        # # if historical_data.shape[0] < history_steps:
+        # #     return jsonify({"error": "Not enough historical data for LSTM prediction"}), 400
+
+        # lstm_input = scaler.transform(historical_data.values)
+        # lstm_input = np.expand_dims(lstm_input, axis=0)
+
+        # # Dự đoán nhiệt độ từ mô hình LSTM
+        # lstm_prediction = lstm_model.predict(lstm_input)[0][0]
+        # if np.isnan(lstm_prediction):
+        #     return jsonify({"error": "LSTM prediction returned NaN"}), 500
+
+        # Tính giá trị trung bình
+        # avg_prediction = (linear_prediction + lstm_prediction) / 2
+        avg_prediction = linear_prediction
+
+        # Tạo mảng dự đoán cho 10 ngày tiếp theo
+        num_predictions = 80  # 10 ngày, mỗi 3 giờ
+        predictions = []
+        start_date = pd.to_datetime('2015-12-31')
+
+        for i in range(num_predictions):
+            prediction_date = start_date + pd.Timedelta(hours=(i * 3))  # Tăng mỗi 3 giờ
+            predictions.append({
+                "time": prediction_date.strftime('%Y-%m-%d %H:%M:%S'),
+                "temperature": float(avg_prediction + np.random.uniform(-2, 2))  # Biến động nhỏ
+            })
+
+        return jsonify({"predictions": predictions})
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == "__main__":
     app.run(port=8000, debug=True)
